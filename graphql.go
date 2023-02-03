@@ -96,6 +96,10 @@ func (c *Client) do(ctx context.Context, op operationType, v any, variables map[
 		}
 	}
 	if len(out.Errors) > 0 {
+		if out.Extensions != nil {
+			return newErrorsWithExtensions(out.Errors, out.Extensions)
+		}
+
 		return out.Errors
 	}
 	return nil
@@ -125,3 +129,20 @@ const (
 	mutationOperation
 	//subscriptionOperation // Unused.
 )
+
+type ErrorsWithExtensions struct {
+	errors     errors
+	extensions interface{}
+}
+
+func newErrorsWithExtensions(err errors, extensions interface{}) ErrorsWithExtensions {
+	return ErrorsWithExtensions{errors: err, extensions: extensions}
+}
+
+func (e ErrorsWithExtensions) Error() string {
+	return e.errors[0].Message
+}
+
+func (e ErrorsWithExtensions) Extensions() interface{} {
+	return e.extensions
+}
