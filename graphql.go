@@ -103,7 +103,7 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 	}
 	var out struct {
 		Data       *json.RawMessage
-		Errors     errors
+		Errors     GraphQLErrors
 		Extensions interface{}
 	}
 
@@ -118,29 +118,29 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 		}
 	}
 	if len(out.Errors) > 0 {
-		if out.Extensions != nil {
-			return newErrorsWithExtensions(out.Errors, out.Extensions)
-		}
-
 		return out.Errors
 	}
 	return nil
 }
 
-// errors represents the "errors" array in a response from a GraphQL server.
+// GraphQLErrors represents the "GraphQLErrors" array in a response from a GraphQL server.
 // If returned via error interface, the slice is expected to contain at least 1 element.
 //
 // Specification: https://facebook.github.io/graphql/#sec-Errors.
-type errors []struct {
+// Actual implementation:
+// https://github.com/spacelift-io/graphql-go/blob/4c5b960673418ee4577498869c8dfa2c66628458/GraphQLErrors/GraphQLErrors.go#L7
+type GraphQLErrors []struct {
 	Message   string
 	Locations []struct {
 		Line   int
 		Column int
 	}
+	Path       []interface{}
+	Extensions map[string]interface{}
 }
 
 // Error implements error interface.
-func (e errors) Error() string {
+func (e GraphQLErrors) Error() string {
 	return e[0].Message
 }
 
@@ -151,20 +151,3 @@ const (
 	mutationOperation
 	//subscriptionOperation // Unused.
 )
-
-type ErrorsWithExtensions struct {
-	errors     errors
-	extensions interface{}
-}
-
-func newErrorsWithExtensions(err errors, extensions interface{}) ErrorsWithExtensions {
-	return ErrorsWithExtensions{errors: err, extensions: extensions}
-}
-
-func (e ErrorsWithExtensions) Error() string {
-	return e.errors[0].Message
-}
-
-func (e ErrorsWithExtensions) Extensions() interface{} {
-	return e.extensions
-}

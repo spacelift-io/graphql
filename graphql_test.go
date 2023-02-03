@@ -115,12 +115,12 @@ func TestClient_Query_noDataWithErrorAndExtensionsResponse(t *testing.T) {
 							"line": 7,
 							"column": 3
 						}
-					]
-				}
-			],
-			"extensions": {
-				"code": "MISSING_ARGUMENTS"
-			}
+					],
+					"extensions": {
+						"code": "MISSING_ARGUMENTS"
+					}
+				}		
+			]
 		}`)
 	})
 	client := graphql.NewClient("/graphql", &http.Client{Transport: localRoundTripper{handler: mux}})
@@ -140,19 +140,18 @@ func TestClient_Query_noDataWithErrorAndExtensionsResponse(t *testing.T) {
 		t.Errorf("got error: %v, want: %v", got, want)
 	}
 
-	var graphErr graphql.ErrorsWithExtensions
+	var graphErr graphql.GraphQLErrors
 	if !errors.As(err, &graphErr) {
 		t.Fatalf("got error: %T, want: %T", err, graphErr)
 	}
 
-	extensions := graphErr.Extensions()
-	asMap, ok := extensions.(map[string]interface{})
+	extensions := graphErr[0].Extensions
 
-	if !ok {
-		t.Fatalf("got error: %T, want: %T", graphErr.Extensions(), asMap)
+	if len(extensions) == 0 {
+		t.Fatalf("got empty extensions: %v", extensions)
 	}
 
-	if got, want := asMap["code"], "MISSING_ARGUMENTS"; got != want {
+	if got, want := extensions["code"], "MISSING_ARGUMENTS"; got != want {
 		t.Errorf("got error: %v, want: %v", got, want)
 	}
 
