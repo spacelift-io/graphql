@@ -96,16 +96,12 @@ func (c *Client) do(ctx context.Context, op operationType, v any, variables map[
 		}
 	}
 	if len(out.Errors) > 0 {
-		if out.Extensions != nil {
-			return newErrorsWithExtensions(out.Errors, out.Extensions)
-		}
-
 		return out.Errors
 	}
 	return nil
 }
 
-// errors represents the "errors" array in a response from a GraphQL server.
+// GraphQLErrors represents the "GraphQLErrors" array in a response from a GraphQL server.
 // If returned via error interface, the slice is expected to contain at least 1 element.
 //
 // Specification: https://spec.graphql.org/October2021/#sec-Errors.
@@ -115,10 +111,12 @@ type errors []struct {
 		Line   int
 		Column int
 	}
+	Path       []interface{}
+	Extensions map[string]interface{}
 }
 
 // Error implements error interface.
-func (e errors) Error() string {
+func (e GraphQLErrors) Error() string {
 	return e[0].Message
 }
 
@@ -129,20 +127,3 @@ const (
 	mutationOperation
 	//subscriptionOperation // Unused.
 )
-
-type ErrorsWithExtensions struct {
-	errors     errors
-	extensions interface{}
-}
-
-func newErrorsWithExtensions(err errors, extensions interface{}) ErrorsWithExtensions {
-	return ErrorsWithExtensions{errors: err, extensions: extensions}
-}
-
-func (e ErrorsWithExtensions) Error() string {
-	return e.errors[0].Message
-}
-
-func (e ErrorsWithExtensions) Extensions() interface{} {
-	return e.extensions
-}
