@@ -102,12 +102,12 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 		}
 	}
 	var out struct {
-		Data   *json.RawMessage
-		Errors errors
-		//Extensions interface{} // Unused.
+		Data       *json.RawMessage
+		Errors     errors
+		Extensions interface{}
 	}
-	err = json.NewDecoder(resp.Body).Decode(&out)
-	if err != nil {
+
+	if err := json.Unmarshal(body, &out); err != nil {
 		return &BodyError{Err: err, Body: body}
 	}
 
@@ -118,6 +118,10 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 		}
 	}
 	if len(out.Errors) > 0 {
+		if out.Extensions != nil {
+			return newErrorsWithExtensions(out.Errors, out.Extensions)
+		}
+
 		return out.Errors
 	}
 	return nil
@@ -147,3 +151,20 @@ const (
 	mutationOperation
 	//subscriptionOperation // Unused.
 )
+
+type ErrorsWithExtensions struct {
+	errors     errors
+	extensions interface{}
+}
+
+func newErrorsWithExtensions(err errors, extensions interface{}) ErrorsWithExtensions {
+	return ErrorsWithExtensions{errors: err, extensions: extensions}
+}
+
+func (e ErrorsWithExtensions) Error() string {
+	return e.errors[0].Message
+}
+
+func (e ErrorsWithExtensions) Extensions() interface{} {
+	return e.extensions
+}
