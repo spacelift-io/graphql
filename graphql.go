@@ -8,7 +8,6 @@ import (
 	"net/http"
 
 	"github.com/shurcooL/graphql/internal/jsonutil"
-	"golang.org/x/net/context/ctxhttp"
 )
 
 // Client is a GraphQL client.
@@ -84,7 +83,7 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 		}
 	}
 
-	resp, err := ctxhttp.Do(ctx, c.httpClient, req)
+	resp, err := doWithCtx(ctx, c.httpClient, req)
 	if err != nil {
 		return &ResponseError{Err: err}
 	}
