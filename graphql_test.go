@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -184,6 +183,38 @@ func TestClient_Query_errorStatusCode(t *testing.T) {
 	}
 }
 
+func TestClient_RequestOptions(t *testing.T) {
+	var receivedHeaders http.Header
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/graphql", func(w http.ResponseWriter, req *http.Request) {
+		receivedHeaders = req.Header
+		http.Error(w, "important message", http.StatusInternalServerError)
+	})
+	client := graphql.NewClient("/graphql", &http.Client{Transport: localRoundTripper{handler: mux}})
+
+	sentHeaderKey, sentHeaderValue := "X-Test-Header", "test-value"
+
+	var q struct {
+		User struct {
+			Name graphql.String
+		}
+	}
+	err := client.Query(context.Background(), &q, nil, graphql.WithHeader(sentHeaderKey, sentHeaderValue))
+	if err == nil {
+		t.Fatal("got error: nil, want: non-nil")
+	}
+	if got, want := err.Error(), `non-200 OK status code: 500 Internal Server Error body: "important message\n"`; got != want {
+		t.Errorf("got error: %v, want: %v", got, want)
+	}
+	if q.User.Name != "" {
+		t.Errorf("got non-empty q.User.Name: %v", q.User.Name)
+	}
+	if got, want := receivedHeaders.Get(sentHeaderKey), sentHeaderValue; got != want {
+		t.Errorf("got header %q: %q, want: %q", sentHeaderKey, got, want)
+	}
+}
+
 // Test that an empty (but non-nil) variables map is
 // handled no differently than a nil variables map.
 func TestClient_Query_emptyVariables(t *testing.T) {
@@ -225,7 +256,7 @@ func (l localRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 }
 
 func mustRead(r io.Reader) string {
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		panic(err)
 	}

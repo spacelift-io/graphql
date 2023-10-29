@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/shurcooL/graphql/internal/jsonutil"
@@ -53,10 +54,9 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 	case mutationOperation:
 		query = constructMutation(v, variables)
 	}
-
 	in := struct {
-		Query     string                 `json:"query"`
-		Variables map[string]interface{} `json:"variables,omitempty"`
+		Query     string         `json:"query"`
+		Variables map[string]any `json:"variables,omitempty"`
 	}{
 		Query:     query,
 		Variables: variables,
@@ -66,10 +66,9 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 	if err != nil {
 		return err
 	}
-
-	req, err := http.NewRequest(http.MethodPost, c.url, &buf)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url, &buf)
 	if err != nil {
-		return &RequestError{Err: err}
+		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
@@ -83,37 +82,29 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 		}
 	}
 
-	resp, err := doWithCtx(ctx, c.httpClient, req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return &ResponseError{Err: err}
+		return err
 	}
 	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return &ResponseError{Err: err}
-	}
-
 	if resp.StatusCode != http.StatusOK {
-		return &ServerError{
-			Body:   body,
-			Status: resp.Status,
-		}
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("non-200 OK status code: %v body: %q", resp.Status, body)
 	}
 	var out struct {
-		Data       *json.RawMessage
-		Errors     GraphQLErrors
-		Extensions interface{}
+		Data   *json.RawMessage
+		Errors GraphQLErrors
 	}
-
-	if err := json.Unmarshal(body, &out); err != nil {
-		return &BodyError{Err: err, Body: body}
+	err = json.NewDecoder(resp.Body).Decode(&out)
+	if err != nil {
+		// TODO: Consider including response body in returned error, if deemed helpful.
+		return err
 	}
-
 	if out.Data != nil {
 		err := jsonutil.UnmarshalGraphQL(*out.Data, v)
 		if err != nil {
-			return &BodyError{Err: err, Body: body}
+			// TODO: Consider including response body in returned error, if deemed helpful.
+			return err
 		}
 	}
 	if len(out.Errors) > 0 {
