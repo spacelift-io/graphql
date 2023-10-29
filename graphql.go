@@ -80,8 +80,7 @@ func (c *Client) do(ctx context.Context, op operationType, v any, variables map[
 	}
 	var out struct {
 		Data   *json.RawMessage
-		Errors errors
-		//Extensions any // Unused.
+		Errors GraphQLErrors
 	}
 	err = json.NewDecoder(resp.Body).Decode(&out)
 	if err != nil {
@@ -104,8 +103,10 @@ func (c *Client) do(ctx context.Context, op operationType, v any, variables map[
 // GraphQLErrors represents the "GraphQLErrors" array in a response from a GraphQL server.
 // If returned via error interface, the slice is expected to contain at least 1 element.
 //
-// Specification: https://spec.graphql.org/October2021/#sec-Errors.
-type errors []struct {
+// Specification: https://facebook.github.io/graphql/#sec-Errors.
+// Actual implementation:
+// https://github.com/spacelift-io/graphql-go/blob/4c5b960673418ee4577498869c8dfa2c66628458/GraphQLErrors/GraphQLErrors.go#L7
+type GraphQLErrors []struct {
 	Message   string
 	Locations []struct {
 		Line   int

@@ -64,43 +64,6 @@ func TestClient_Query_partialDataWithErrorResponse(t *testing.T) {
 	}
 }
 
-func TestClient_Query_noDataWithErrorResponse(t *testing.T) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/graphql", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		mustWrite(w, `{
-			"errors": [
-				{
-					"message": "Field 'user' is missing required arguments: login",
-					"locations": [
-						{
-							"line": 7,
-							"column": 3
-						}
-					]
-				}
-			]
-		}`)
-	})
-	client := graphql.NewClient("/graphql", &http.Client{Transport: localRoundTripper{handler: mux}})
-
-	var q struct {
-		User struct {
-			Name graphql.String
-		}
-	}
-	err := client.Query(context.Background(), &q, nil)
-	if err == nil {
-		t.Fatal("got error: nil, want: non-nil")
-	}
-	if got, want := err.Error(), "Field 'user' is missing required arguments: login"; got != want {
-		t.Errorf("got error: %v, want: %v", got, want)
-	}
-	if q.User.Name != "" {
-		t.Errorf("got non-empty q.User.Name: %v", q.User.Name)
-	}
-}
-
 func TestClient_Query_noDataWithErrorAndExtensionsResponse(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/graphql", func(w http.ResponseWriter, req *http.Request) {
@@ -118,7 +81,7 @@ func TestClient_Query_noDataWithErrorAndExtensionsResponse(t *testing.T) {
 					"extensions": {
 						"code": "MISSING_ARGUMENTS"
 					}
-				}		
+				}
 			]
 		}`)
 	})
@@ -130,13 +93,8 @@ func TestClient_Query_noDataWithErrorAndExtensionsResponse(t *testing.T) {
 		}
 	}
 	err := client.Query(context.Background(), &q, nil)
-
 	if err == nil {
 		t.Fatal("got error: nil, want: non-nil")
-	}
-
-	if got, want := err.Error(), "Field 'user' is missing required arguments: login"; got != want {
-		t.Errorf("got error: %v, want: %v", got, want)
 	}
 
 	var graphErr graphql.GraphQLErrors
@@ -154,6 +112,9 @@ func TestClient_Query_noDataWithErrorAndExtensionsResponse(t *testing.T) {
 		t.Errorf("got error: %v, want: %v", got, want)
 	}
 
+	if got, want := err.Error(), "Field 'user' is missing required arguments: login"; got != want {
+		t.Errorf("got error: %v, want: %v", got, want)
+	}
 	if q.User.Name != "" {
 		t.Errorf("got non-empty q.User.Name: %v", q.User.Name)
 	}
