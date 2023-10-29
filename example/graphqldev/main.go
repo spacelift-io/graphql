@@ -1,3 +1,5 @@
+//go:build ignore
+
 // graphqldev is a test program currently being used for developing graphql package.
 // It performs queries against a local test GraphQL server instance.
 //
@@ -70,7 +72,7 @@ func run() error {
 			AppearsIn []graphql.String
 		} `graphql:"character(id: $characterID)"`
 	}
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"characterID": graphql.ID("1003"),
 	}
 	err = client.Query(context.Background(), &q, variables)
@@ -83,7 +85,7 @@ func run() error {
 }
 
 // print pretty prints v to stdout. It panics on any error.
-func print(v interface{}) {
+func print(v any) {
 	w := json.NewEncoder(os.Stdout)
 	w.SetIndent("", "\t")
 	err := w.Encode(v)
