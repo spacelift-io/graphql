@@ -11,11 +11,13 @@ import (
 	"github.com/shurcooL/graphql/internal/jsonutil"
 )
 
+type debugLoggerFunc func(context.Context, string)
+
 // Client is a GraphQL client.
 type Client struct {
 	url            string // GraphQL server URL.
 	httpClient     *http.Client
-	debugLogger    func(string)
+	debugLogger    debugLoggerFunc
 	requestOptions []RequestOption
 }
 
@@ -29,7 +31,7 @@ func NewClient(url string, httpClient *http.Client, opts ...RequestOption) *Clie
 	return newClientInternal(url, httpClient, nil, opts...)
 }
 
-func NewDebugClient(url string, httpClient *http.Client, debugLogger func(string), opts ...RequestOption) *Client {
+func NewDebugClient(url string, httpClient *http.Client, debugLogger debugLoggerFunc, opts ...RequestOption) *Client {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
@@ -37,7 +39,7 @@ func NewDebugClient(url string, httpClient *http.Client, debugLogger func(string
 	return newClientInternal(url, httpClient, debugLogger, opts...)
 }
 
-func newClientInternal(url string, httpClient *http.Client, debugLogger func(string), opts ...RequestOption) *Client {
+func newClientInternal(url string, httpClient *http.Client, debugLogger debugLoggerFunc, opts ...RequestOption) *Client {
 	return &Client{
 		url:            url,
 		httpClient:     httpClient,
@@ -104,10 +106,10 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 	defer resp.Body.Close()
 
 	if c.debugLogger != nil {
-		c.debugLogger(fmt.Sprintf("GraphQL request body: %s", buf.String()))
-		c.debugLogger(fmt.Sprintf("GraphQL response status: %s", resp.Status))
+		c.debugLogger(ctx, fmt.Sprintf("GraphQL request body: %s", buf.String()))
+		c.debugLogger(ctx, fmt.Sprintf("GraphQL response status: %s", resp.Status))
 		body, _ := io.ReadAll(resp.Body)
-		c.debugLogger(fmt.Sprintf("GraphQL response body: %s", body))
+		c.debugLogger(ctx, fmt.Sprintf("GraphQL response body: %s", body))
 	}
 
 	if resp.StatusCode != http.StatusOK {
