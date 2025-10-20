@@ -105,22 +105,25 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 	}
 	defer resp.Body.Close()
 
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
 	if c.debugLogger != nil {
 		c.debugLogger(ctx, fmt.Sprintf("GraphQL request body: %s", buf.String()))
 		c.debugLogger(ctx, fmt.Sprintf("GraphQL response status: %s", resp.Status))
-		body, _ := io.ReadAll(resp.Body)
-		c.debugLogger(ctx, fmt.Sprintf("GraphQL response body: %s", body))
+		c.debugLogger(ctx, fmt.Sprintf("GraphQL response body: %s", respBody))
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("non-200 OK status code: %v body: %q", resp.Status, body)
+		return fmt.Errorf("non-200 OK status code: %v body: %q", resp.Status, respBody)
 	}
 	var out struct {
 		Data   *json.RawMessage
 		Errors GraphQLErrors
 	}
-	err = json.NewDecoder(resp.Body).Decode(&out)
+	err = json.Unmarshal(respBody, &out)
 	if err != nil {
 		// TODO: Consider including response body in returned error, if deemed helpful.
 		return err
