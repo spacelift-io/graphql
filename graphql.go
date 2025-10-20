@@ -15,6 +15,7 @@ import (
 type Client struct {
 	url            string // GraphQL server URL.
 	httpClient     *http.Client
+	debugLogger    func(string)
 	requestOptions []RequestOption
 }
 
@@ -24,9 +25,23 @@ func NewClient(url string, httpClient *http.Client, opts ...RequestOption) *Clie
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
+
+	return newClientInternal(url, httpClient, nil, opts...)
+}
+
+func NewDebugClient(url string, httpClient *http.Client, debugLogger func(string), opts ...RequestOption) *Client {
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
+
+	return newClientInternal(url, httpClient, debugLogger, opts...)
+}
+
+func newClientInternal(url string, httpClient *http.Client, debugLogger func(string), opts ...RequestOption) *Client {
 	return &Client{
 		url:            url,
 		httpClient:     httpClient,
+		debugLogger:    debugLogger,
 		requestOptions: opts,
 	}
 }
@@ -87,6 +102,14 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 		return err
 	}
 	defer resp.Body.Close()
+
+	if c.debugLogger != nil {
+		c.debugLogger(fmt.Sprintf("GraphQL request body: %s", buf.String()))
+		c.debugLogger(fmt.Sprintf("GraphQL response status: %s", resp.Status))
+		body, _ := io.ReadAll(resp.Body)
+		c.debugLogger(fmt.Sprintf("GraphQL response body: %s", body))
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("non-200 OK status code: %v body: %q", resp.Status, body)
