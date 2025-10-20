@@ -31,7 +31,7 @@ func NewClient(url string, httpClient *http.Client, opts ...RequestOption) *Clie
 	return newClientInternal(url, httpClient, nil, opts...)
 }
 
-func NewDebugClient(url string, httpClient *http.Client, debugLogger debugLoggerFunc, opts ...RequestOption) *Client {
+func NewClientWithDebugging(url string, httpClient *http.Client, debugLogger debugLoggerFunc, opts ...RequestOption) *Client {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
