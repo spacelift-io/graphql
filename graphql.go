@@ -71,6 +71,7 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 	case mutationOperation:
 		query = constructMutation(v, variables)
 	}
+
 	in := struct {
 		Query     string         `json:"query"`
 		Variables map[string]any `json:"variables,omitempty"`
@@ -78,12 +79,13 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 		Query:     query,
 		Variables: variables,
 	}
-	var buf bytes.Buffer
-	err := json.NewEncoder(&buf).Encode(in)
+
+	reqBody, err := json.Marshal(in)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url, &buf)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url, bytes.NewReader(reqBody))
 	if err != nil {
 		return err
 	}
@@ -111,7 +113,7 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 	}
 
 	if c.debugLogger != nil {
-		c.debugLogger(ctx, fmt.Sprintf("GraphQL request body: %s", buf.String()))
+		c.debugLogger(ctx, fmt.Sprintf("GraphQL request body: %s", reqBody))
 		c.debugLogger(ctx, fmt.Sprintf("GraphQL response status: %s", resp.Status))
 		c.debugLogger(ctx, fmt.Sprintf("GraphQL response body: %s", respBody))
 	}
