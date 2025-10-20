@@ -221,7 +221,7 @@ func TestClient_Query_emptyVariables(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/graphql", func(w http.ResponseWriter, req *http.Request) {
 		body := mustRead(req.Body)
-		if got, want := body, `{"query":"{user{name}}"}`+"\n"; got != want {
+		if got, want := body, `{"query":"{user{name}}"}`; got != want {
 			t.Errorf("got body: %v, want %v", got, want)
 		}
 		w.Header().Set("Content-Type", "application/json")

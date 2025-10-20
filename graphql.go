@@ -11,10 +11,13 @@ import (
 	"github.com/shurcooL/graphql/internal/jsonutil"
 )
 
+type debugLoggerFunc func(context.Context, string)
+
 // Client is a GraphQL client.
 type Client struct {
 	url            string // GraphQL server URL.
 	httpClient     *http.Client
+	debugLogger    debugLoggerFunc
 	requestOptions []RequestOption
 }
 
@@ -24,9 +27,23 @@ func NewClient(url string, httpClient *http.Client, opts ...RequestOption) *Clie
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
+
+	return newClientInternal(url, httpClient, nil, opts...)
+}
+
+func NewClientWithDebugging(url string, httpClient *http.Client, debugLogger debugLoggerFunc, opts ...RequestOption) *Client {
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
+
+	return newClientInternal(url, httpClient, debugLogger, opts...)
+}
+
+func newClientInternal(url string, httpClient *http.Client, debugLogger debugLoggerFunc, opts ...RequestOption) *Client {
 	return &Client{
 		url:            url,
 		httpClient:     httpClient,
+		debugLogger:    debugLogger,
 		requestOptions: opts,
 	}
 }
@@ -54,6 +71,7 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 	case mutationOperation:
 		query = constructMutation(v, variables)
 	}
+
 	in := struct {
 		Query     string         `json:"query"`
 		Variables map[string]any `json:"variables,omitempty"`
@@ -61,12 +79,13 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 		Query:     query,
 		Variables: variables,
 	}
-	var buf bytes.Buffer
-	err := json.NewEncoder(&buf).Encode(in)
+
+	reqBody, err := json.Marshal(in)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url, &buf)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url, bytes.NewReader(reqBody))
 	if err != nil {
 		return err
 	}
@@ -87,15 +106,26 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 		return err
 	}
 	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	if c.debugLogger != nil {
+		c.debugLogger(ctx, fmt.Sprintf("GraphQL request body: %s", reqBody))
+		c.debugLogger(ctx, fmt.Sprintf("GraphQL response status: %s", resp.Status))
+		c.debugLogger(ctx, fmt.Sprintf("GraphQL response body: %s", respBody))
+	}
+
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("non-200 OK status code: %v body: %q", resp.Status, body)
+		return fmt.Errorf("non-200 OK status code: %v body: %q", resp.Status, respBody)
 	}
 	var out struct {
 		Data   *json.RawMessage
 		Errors GraphQLErrors
 	}
-	err = json.NewDecoder(resp.Body).Decode(&out)
+	err = json.Unmarshal(respBody, &out)
 	if err != nil {
 		// TODO: Consider including response body in returned error, if deemed helpful.
 		return err
